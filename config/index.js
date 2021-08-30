@@ -1,6 +1,4 @@
 const fetch = require('node-fetch');
-
-
 const JUEJIN = {
     headers:{
         'content-type': 'application/json; charset=utf-8',
@@ -14,14 +12,17 @@ const JUEJIN = {
         cookie:null
     },
     checkIsSignin(){
-        return new Promise( (resolve,reject) =>{
+        return new Promise( ( resolve, reject ) =>{
             fetch('https://api.juejin.cn/growth_api/v1/get_today_status', { 
                 headers:this.headers, 
                 method: 'GET', 
                 credentials: 'include' 
             })
             .then( config => config.json())
-            .then( ({ data }) => data === false ? resolve(true) : reject( false ) );
+            .then( res => {
+                console.log('111',res)
+                res.data === false ? resolve(true) : reject( false )
+            } );
         })
         
     },
@@ -46,7 +47,9 @@ const JUEJIN = {
                 credentials: 'include' 
             })
             .then( config => config.json() )
-            .then( res => res.data.free_count >= 1 ? resolve(1) : reject(0) );
+            .then( res => {
+                res.data.free_count === 1 ? resolve(1) : reject(0) 
+            });
         })
     },
     draw(){
@@ -58,46 +61,68 @@ const JUEJIN = {
             })
             .then( config => config.json() )
             .then( ({ data }) => {
-                console.log('抽奖成功',data)
                 resolve(data.lottery_name)
             });
         })
     }
 }
-
 //签到
-function SIGNIN(){
+function SIGNIN( current_user_name ){
     return new Promise( resolve =>{
         JUEJIN.checkIsSignin().then( () =>{
             JUEJIN.signin().then( sum_point =>{
-                console.log('sum_point',sum_point);
                 DRAW().then( res => {
-                    console.log('aaaaa',res)
-                    let r = [`签到成功！当前总矿石数${ sum_point }`, res]
-                    console.log('rrrr',r)
-                    resolve( r )
+                    resolve([`签到成功！当前总矿石数${ sum_point }`, res])
                 })
             })
         }).catch( err =>{
-            DRAW().then( res => resolve( [`已经签到过了`, res] ) )
+            DRAW().then( res => {
+                resolve( [`已经签到过了`, res] )
+            })
         })
     })
 }
 //免费抽奖
 function DRAW(){
     return new Promise( resolve =>{
-        JUEJIN.check_in().then( () =>{
-            JUEJIN.draw( lottery_name =>{
-                console.log('-----',lottery_name)
+        JUEJIN.check_in()
+        .then( () =>{
+            JUEJIN.draw()
+            .then( lottery_name =>{
                 resolve(`免费抽奖成功：${lottery_name}`)
             })
-        }).catch(err =>{
+        })
+        .catch(err =>{
             resolve('没有免费抽奖次数了')
         })
     })
 }
 
+function notifyDingTalk(content){
+    let data = {
+        "msgtype": "text",
+        "text":{
+            "content": content 
+        },
+        "at":{
+            "atMobiles": [
+                "18720706348"
+            ], 
+        }
+    }
+    fetch('https://oapi.dingtalk.com/robot/send?access_token=cc54112dbe4d1505569a14d7b79fcf1dba9158543dc15db8b36a01f26d1e1aa3', { 
+        headers:{ "Content-Type": "application/json" }, 
+        method: 'POST',
+        body:JSON.stringify(data)
+    })
+    .then( config => config.json())
+    .then( res => {
+        console.log(res)
+    });
+}
+
 module.exports = {
     api:JUEJIN,
     startSignin:SIGNIN,
+    notifyDingTalk,
 }
